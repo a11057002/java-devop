@@ -1,0 +1,53 @@
+version: "3.7"
+services:
+  tomcat: 
+    build: Tomcat
+    image: devsecops_tomcat
+    container_name: tomcat
+    restart: always
+    networks:
+      DevSecOps:
+        ipv4_address: 172.28.0.2
+    ports: 
+      - 8898:8080 
+  jenkins:
+    build: Jenkins
+    image: devsecops_jenkins
+    container_name: jenkins
+    restart: always
+    ports: 
+      - 8899:8080
+    networks:
+      DevSecOps:
+        ipv4_address: 172.28.0.3
+  sonarqube:
+    image: sonarqube:8.7.1-community
+    container_name: sonarqube
+    restart: always
+    ports:
+      - 8900:9000
+    networks:
+      DevSecOps:
+        ipv4_address: 172.28.0.4
+  zap:
+    build: Zap
+    image: devsecops_zap
+    container_name: zap
+    command: [
+    "zap.sh",
+    "-daemon",
+    "-port","8080","-host","0.0.0.0",
+    "-config", "api.addrs.addr.name=.*",
+    "-config", "api.addrs.addr.regex=true", 
+    "-config", "api.disablekey=true"
+    ]
+    networks:
+      DevSecOps:
+        ipv4_address: 172.28.0.5
+networks:
+  DevSecOps:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1

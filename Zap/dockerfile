@@ -1,0 +1,13 @@
+FROM owasp/zap2docker-stable 
+
+# 下載 jq 並加入 run.sh 以利之後使用
+USER root
+COPY run.sh /zap/run.sh
+COPY start.sh /zap/start.sh
+RUN mkdir /zap/reports
+RUN echo "root:docker"|chpasswd 
+
+RUN apt-get update && apt-get install -y jq openssh-server vim
+
+RUN sed -i 's/.*PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
+ENTRYPOINT ["/zap/start.sh"]

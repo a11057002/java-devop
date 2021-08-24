@@ -1,0 +1,73 @@
+pipeline{
+    agent any
+    environment {
+        ZAP_URL = "http://192.168.11.11:8080/pharmacy"
+        LEVEL = "Low"
+        THRESHOLD = 10
+        TOMCAT = "172.17.0.4"
+        GITHUB = "https://github.com/Megu7201/mask.git"
+        SONARQUBE = "http://192.168.11.11:9000"
+        SERVER = "soselab@140.121.197.135"
+    }
+    
+    stages{
+        stage("Git clone"){
+            steps{
+                git url:"${GITHUB}"
+            }
+        }
+        
+        stage("Build and Test"){
+            steps{
+              withMaven(maven:'maven'){
+                   sh "mvn clean install"
+              }
+            }
+        }
+        
+        stage('Sonar Analysis'){
+            steps{
+                withMaven(maven:'maven'){
+                    withSonarQubeEnv('sonar'){
+                        withCredentials([usernamePassword(credentialsId:'92da05f6-e4ed-4bb0-a317-1df36d74ff66',usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]){
+                            sh "mvn sonar:sonar  -D sonar.login=$USERNAME -D sonar.password=$PASSWORD -D sonar.host.url=${SONARQUBE} -D sonar.projectKey=mask"
+                        }
+                    }
+                }
+            }
+        }
+    
+        stage('Quality Gate'){
+            steps{
+                sleep(10)
+                timeout(time:1,unit:'MINUTES'){
+                    script{
+                        qg = waitForQualityGate()
+                        if (qg.status != 'OK'){
+                            error "Pipeline aborted due to quality gate failed!"
+                        }
+                    }
+                }
+            }
+        }
+    
+        stage('Deploy to testing Enviornment'){
+            steps{
+                sh 'scp target/*.war root@${TOMCAT}:/usr/local/tomcat/webapps'
+            }
+        }
+    
+        stage('Run ZAP for DAST'){
+            steps{
+                sh 'ssh -p 8877 ${SERVER} "docker exec zap bash run.sh ${ZAP_URL}  ${THRESHOLD}  ${LEVEL}"'
+            }
+        }
+    
+         stage('Deploy to Heroku'){
+            steps{
+                sh "heroku plugins:install java"
+                sh "heroku deploy:war target/pharmacy.war -a soselab"
+            }
+        }
+    }
+}
